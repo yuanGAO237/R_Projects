@@ -1,0 +1,492 @@
+---
+title: "House Saleprice Prediction project"
+author: "Yuan Gao (yuang7)"
+date: "8/3/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Title**
+Regression Model for House Prices Prediction 
+**Team members** 
+Yuan Gao & Xiao Qin
+
+## Introduction
+
+**Dataset Descripton**
+
+The datasets are house prices dataset from Kaggle, including a training dataset (house_trn.csv) and a test dataset (house_tst.csv). The training dataset has 81 columns and 1460 records and the test dataset has 80 columns and 1459 records.
+
+We pick this dataset because it provides many features potentially related to house price, which is good for us to explore and find a good model.
+
+MSZoning: Identifies the general zoning classification of the sale.
+		
+       A	Agriculture
+       C	Commercial
+       FV	Floating Village Residential
+       I	Industrial
+       RH	Residential High Density
+       RL	Residential Low Density
+       RP	Residential Low Density Park 
+       RM	Residential Medium Density
+
+LotFrontage: Linear feet of street connected to property
+
+LotArea: Lot size in square feet
+
+Neighborhood: Physical locations within Ames city limits
+
+       Blmngtn	Bloomington Heights
+       Blueste	Bluestem
+       BrDale	Briardale
+       BrkSide	Brookside
+       ClearCr	Clear Creek
+       CollgCr	College Creek
+       Crawfor	Crawford
+       Edwards	Edwards
+       Gilbert	Gilbert
+       IDOTRR	Iowa DOT and Rail Road
+       MeadowV	Meadow Village
+       Mitchel	Mitchell
+       Names	North Ames
+       NoRidge	Northridge
+       NPkVill	Northpark Villa
+       NridgHt	Northridge Heights
+       NWAmes	Northwest Ames
+       OldTown	Old Town
+       SWISU	South & West of Iowa State University
+       Sawyer	Sawyer
+       SawyerW	Sawyer West
+       Somerst	Somerset
+       StoneBr	Stone Brook
+       Timber	Timberland
+       Veenker	Veenker
+
+
+BldgType: Type of dwelling
+		
+       1Fam	Single-family Detached	
+       2FmCon	Two-family Conversion; originally built as one-family dwelling
+       Duplx	Duplex
+       TwnhsE	Townhouse End Unit
+       TwnhsI	Townhouse Inside Unit
+	
+HouseStyle: Style of dwelling
+	
+       1Story	One story
+       1.5Fin	One and one-half story: 2nd level finished
+       1.5Unf	One and one-half story: 2nd level unfinished
+       2Story	Two story
+       2.5Fin	Two and one-half story: 2nd level finished
+       2.5Unf	Two and one-half story: 2nd level unfinished
+       SFoyer	Split Foyer
+       SLvl	Split Level
+OverallCond: Rates the overall condition of the house
+
+       10	Very Excellent
+       9	Excellent
+       8	Very Good
+       7	Good
+       6	Above Average	
+       5	Average
+       4	Below Average	
+       3	Fair
+       2	Poor
+       1	Very Poor
+SaleCondition: Condition of sale
+
+       Normal	Normal Sale
+       Abnorml	Abnormal Sale -  trade, foreclosure, short sale
+       AdjLand	Adjoining Land Purchase
+       Alloca	Allocation - two linked properties with separate deeds, typically condo with a garage unit	
+       Family	Sale between family members
+       Partial	Home was not completed when last assessed (associated with New Homes)
+
+**Reason and Goal**
+
+- Reason
+
+House price is important for almost everyone who ever consider buying a house or building a house. 
+
+House price prediction is important for people who want to buy a house for residence purpose or for investment purpose. It gives them an idea of the price when negoiating with the house seller. For example, they get a predicted price based on the LotArea, LotShape, Neighborhood and other factors. If there is a discrepency between this predicted price and listing price, they maybe able to negotiate better based on the prediction information. 
+
+Knowing what could infludence house price also give house builder an idea of where or what kind of house they should make or what feature they should add to the house to max their profit.
+
+- Goal
+
+We would like to use the multiple regression model created based on this dataset to predict house price for houses in Ames City.
+
+
+## Methods
+
+### Data Preprocessing
+
+- Import and clean data. 
+- Transform certain data to factor type,so to be used as dummy variables.
+```{r}
+# Preprocessing: Import and clean data
+library(readr)
+data=read.csv('house_trn.csv')
+data=data[c('MSZoning','LotFrontage','LotArea','Neighborhood','BldgType','HouseStyle','OverallCond','SaleCondition','SalePrice')]
+data=na.omit(data)
+data$MSZoning=as.factor(data$MSZoning)
+data$Neighborhood=as.factor(data$Neighborhood)
+data$BldgType=as.factor(data$BldgType)
+data$HouseStyle=as.factor(data$HouseStyle)
+data$OverallCond=as.factor(data$OverallCond)
+data$SaleCondition=as.factor(data$SaleCondition)
+
+# Split data dataset into training data and test data
+smp_size <- floor(0.75 * nrow(data))
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(data)), size = smp_size)
+train = data[train_ind, ]
+test=data[-train_ind, ]
+```
+
+
+### Plot of Response(SalePrice) against each factors
+
+Visualize the relationships to see if there is discernable linear relationship.
+```{r}
+#pairs(train)
+# Plot SalePrice
+plot(data$SalePrice,type="p")
+
+# Plot SalePrice against other features
+plot(SalePrice~LotFrontage, data=train)
+plot(SalePrice~LotArea, data=train)
+plot(SalePrice~MSZoning,data=train)
+plot(SalePrice~Neighborhood,data=train)
+plot(SalePrice~BldgType,data=train)
+plot(SalePrice~HouseStyle,data=train)
+plot(SalePrice~OverallCond,data=train)
+plot(SalePrice~SaleCondition,data=train)
+
+outlier1=train[which.max(train$LotArea),]
+outlier2=train[which.max(train$LotFrontage),]
+a=which.max(train$LotArea)
+b=which.max(train$LotFrontage)
+outliers=c(a,b)
+```
+
+- By observing the graph, we would see that there could be a linear relationship between SalePrice and LotFrontage, SalsPrice and LotArea and there are also outliers and influential points, which we may consider removing later.
+
+### Model Selection
+
+#### Additive Model
+
+We would like to find the best additive model possible for prediciting house SalePrice based on our dataset. The steps we take are as following:
+
+- Start with Oringinal additive model with all factors
+- check collinearity, compare the model with high GVIF removed and original additive model
+  Comparing adjusted r squared, removing highest GVIF won't improve adjusted r squared,choose the original additive model  
+- Use backward BIC to choose a model, compare this model to the original additive model
+  Performing anova test, choose the orginal additive model
+- Check normality and equal variance assumptions on the model we picked after the previous steps.
+  Performind bptest and shapiro test, failed both
+  perform visualization of qqplot and resdiual plot, in order to understand the distribution better   and have an idea of what transformation to conduct later.
+- Calculate adjusted R squared, to evluate it how good the model fit the training data
+- Calculate RMSE and r squared on test dataset, to evaluate how good the data generalize to test data
+  
+```{r}
+# Find the best additive model
+
+## Additive Model, use all factors as predictor
+library(car)
+library(lmtest)
+########## MODEL 1 ##################
+model_add=lm(SalePrice~. ,data=train)
+summary(model_add)
+```
+
+**Check Collinearity**
+```{r}
+car::vif(model_add)
+# Remove Neighbor with highest GVIF
+model_add_nN=lm(SalePrice~.-Neighborhood ,data=train)
+add_R_nN=summary(model_add_nN)$adj.r.squared
+# Compare adjusted R squared between two models
+add_R=summary(model_add)$adj.r.squared
+ifelse(add_R_nN>add_R,'REMOVE HIGH GVIF','NOT REMOVE HIGH GIVF')
+```
+
+**Model Selection**
+```{r}
+## Use backward BIC to select predictors,small pvalue, reject null, keep original additive model
+model_add_bic=step(model_add,k=log(nrow(train)),trace=0)
+add_R_bic=summary(model_add_bic)$adj.r.squared
+# Anova test: Compare additive model with all factors and the one chosen by backward BIC, turns out Orignial one is better than the one chosen by backward BIC
+ifelse(add_R_bic>add_R,'BIC GOOD','ORIGINAL GOOD')
+anova(model_add_bic,model_add)
+```
+
+**Assumption tests: Normality & Equal Variance**
+```{r}
+# Check equal variance by residual plot
+plot(fitted(model_add),resid(model_add),col='dodgerblue',pch=20,xlab='Fitted',ylab='Residuals',main='House Sale Price Plot')
+abline(h=0,col='darkorange',lwd=2)
+add_model_normality=bptest(model_add)
+# Check normality by qqplot, visualize data for better understanding
+qqnorm(resid(model_add),main='Q-Q Plot, SalePrice',col='grey',pch=20)
+qqline(resid(model_add),col='darkorange',lwd=2)
+add_model_eq=shapiro.test(resid(model_add))
+
+add_bptest=bptest(model_add)$p.value[[1]]
+add_shapiro=shapiro.test(resid(model_add))$p.value[[1]]
+```
+
+- In order to pass assumptions test, remove outliers and influential points to fit the model and see an improvement on both tests.
+
+**Remove Outliers and Influential Points**
+```{r}
+# Remove influential Points and outliers
+train_nout = train[-outliers,]
+model_add=lm(SalePrice~.,train_nout)
+train_cook = cooks.distance(model_add)
+influential=train_cook[train_cook > 4 / length(train_cook)]
+non_inf_ind=train_cook <= 4 /length(train_cook)
+train_non_inf=train[non_inf_ind,]
+############ Model 2 ####################
+model_add_sub = lm(SalePrice~.,data=train_non_inf)
+
+#Check Assumptions
+add_sub_bptest=bptest(model_add_sub)$p.value[[1]]
+add_sub_shapiro=shapiro.test(resid(model_add_sub))$p.value[[1]]
+```
+
+- Furthermore, perform log transformation on response (SalePrice), and observe significant improvement on both tests. Bptest is passed.
+
+**Tranformation on Model**
+```{r}
+#Transformation on response and remove outliers
+model_add_log=lm(log(SalePrice)~.,data=train_nout)
+train_cook = cooks.distance(model_add)
+influential=train_cook[train_cook > 4 / length(train_cook)]
+############## Model 3 ######################
+model_add_log_sub = lm(log(SalePrice)~.,data=train_non_inf)
+# Assumption tests plot
+plot(fitted(model_add_log_sub),resid(model_add_log_sub),col='dodgerblue',pch=20,xlab='Fitted',ylab='Residuals',main='House Sale Price Plot')
+abline(h=0,col='darkorange',lwd=2)
+qqnorm(resid(model_add_log_sub),main='Q-Q Plot',col='grey',pch=20)
+qqline(resid(model_add_log_sub),col='darkorange',lwd=2)
+
+add_log_bptest=bptest(model_add_log_sub)$p.value[[1]]
+add_log_shapiro=shapiro.test(resid(model_add_log_sub))$p.value[[1]]
+```
+ 
+ - Check how well these additive models perform on training set, by calculating adjusted R squared
+
+**Calcualte Adjusted R squared**
+```{r}
+# Check Adjusted R squared on training dataset
+
+adjr_add=summary(model_add)$adj.r.squared
+adjr_add_sub=summary(model_add_sub)$adj.r.squared
+adjr_add_log=summary(model_add_log_sub)$adj.r.squared
+```
+
+ - Check how well these additive models perform on test set, by calculating RMSE and R squared.
+**Calculate RMSE and R squared on Test data** 
+```{r}
+# Test on test set and get RMSE
+RMSE=function(model,validation){
+p= predict(model, validation)
+error=(p-validation$SalePrice)
+RMSE_Model=sqrt(mean(error^2))
+RMSE_Model}
+
+RMSE_log=function(model,validation){
+p= predict(model, validation)
+error=(exp(p)-validation$SalePrice)
+RMSE_Model=sqrt(mean(error^2))
+RMSE_Model}
+
+# RMSE on test dataset 
+RMSE_tst_add=RMSE(model_add,test)
+RMSE_tst_add_sub=RMSE(model_add_sub,test)
+RMSE_tst_add_log=RMSE_log(model_add_log_sub,test)
+
+
+# R squared on test dataset
+rsquared=function(model,validation)
+{
+p = predict(model, validation)
+rss = sum((p - validation$SalePrice) ^ 2)  
+tss = sum((validation$SalePrice - mean(validation$SalePrice)) ^ 2)  
+rsq = 1 - rss/tss
+rsq
+}
+rsquared_log=function(model,validation)
+{
+p = predict(model, validation)
+rss = sum((exp(p) - validation$SalePrice) ^ 2)  
+tss = sum((validation$SalePrice - mean(validation$SalePrice)) ^ 2)  
+rsq = 1 - rss/tss
+rsq
+}
+
+rsquared_test_add=rsquared(model_add,test)
+rsquared_test_add_sub=rsquared(model_add_sub,test)
+rsquared_test_add_log=rsquared_log(model_add_log_sub,test)
+
+```
+
+- Result Table of the statistics for each additive model
+
+```{r}
+library(knitr)
+additive=data.frame(
+model=c(
+  'Additive Model',
+  'Additive Model(outlier&influential removed)',
+  'Additive Model(log transformation on SalePrice,outlier&influential removed)'
+),
+pvalue_bptest=c(
+add_bptest,
+add_sub_bptest,
+add_log_bptest
+),
+pvalue_shapiro=c(
+add_shapiro,
+add_sub_shapiro,
+add_log_shapiro
+),
+train_adj_r_squared=c(
+adjr_add,
+adjr_add_sub,
+adjr_add_log
+),
+test_r_squared=c(
+rsquared_test_add,
+rsquared_test_add_sub,
+rsquared_test_add_log
+),
+test_RMSE=c(
+RMSE_tst_add,
+RMSE_tst_add_sub,
+RMSE_tst_add_log
+)
+)
+
+#kable(additive,caption='Additive Models',digits = c(6,6,10,3,3,2))
+```
+#### Interactive Models (two way interaction)
+The selection of interactive models follows the same procedure as the additive model selection
+
+```{r}
+# Start with two way interaction among all factors 
+########## MODEL 1 ##################
+model_int=lm(SalePrice~.^2 ,data=train)
+#model_int_non=lm(SalePrice~.^2 ,data=train_non_inf)
+#summary(model_int)
+#summary(model_int_non)
+
+#Backward BIC to pick a model, I check the this model using all data vs model using all data excluding outliers and influential points, the statistics P are the same. I also check these on assumption tests and it turned out they have a slightly better score(bigger) for all data one.So I decided to use all data to build models.
+
+# int_bic=step(model_int_non,k=log(nrow(train)),trace=0)
+# I saved the model chosen from above BIC backward selection for saving rmarkdown knitting time
+########## MODEL 2 ##################
+int_bic=lm(SalePrice ~ LotArea + Neighborhood + LotArea:Neighborhood, 
+    data = train)
+########## MODEL 3 ##################
+# Log transformation on SalePrice
+int_bic_log=lm(log(SalePrice) ~ LotArea + Neighborhood + LotArea:Neighborhood, 
+    data = train)
+
+
+# Assumption tests: Normality & Equal Variance
+plot_resid=function(model){
+plot(fitted(model),resid(model),col='dodgerblue',pch=20,xlab='Fitted',ylab='Residuals',main='House Sale Price Plot')
+abline(h=0,col='darkorange',lwd=2)}
+# draw qqplot 
+plot_qq=function(model){
+qqnorm(resid(model_add),main='Q-Q Plot, SalePrice',col='grey',pch=20)
+qqline(resid(model_add),col='darkorange',lwd=2)}
+# bptest, shapiro test funcitons
+bp=function(model){bptest(model)$p.value[[1]]}
+shapiro=function(model){shapiro.test(resid(model))$p.value[[1]]}
+
+#plot_resid(int_bic_log)
+#plot_qq(int_bic_log)
+
+# Adjusted R squared traing data
+adjr_int=summary(model_int)$adj.r.squared
+adjr_int_bic=summary(int_bic)$adj.r.squared
+adjr_int_log=summary(int_bic_log)$adj.r.squared
+
+# RMSE
+RMSE_tst_int=RMSE(model_int,test)
+RMSE_tst_int_bic=RMSE(int_bic,test)
+RMSE_tst_int_log=RMSE_log(int_bic_log,test)
+
+# Result Table
+interactive=data.frame(
+model=c(
+  'Interactive Model',
+  'Interactive Model, BIC backward chosen',
+  'Interactive Model,BIC backward,Log Tranformation on SalePrice'
+),
+pvalue_bptest=c(
+bp(model_int),
+bp(int_bic),
+bp(int_bic_log)
+),
+pvalue_shapiro=c(
+shapiro(model_int),
+shapiro(int_bic),
+shapiro(int_bic_log)
+),
+train_adj_r_squared=c(
+adjr_int,
+adjr_int_bic,
+adjr_int_log
+),
+test_RMSE=c(
+RMSE_tst_int,
+RMSE_tst_int_bic,
+RMSE_tst_int_log
+)
+)
+#kable(interactive,caption='Interactive Models',digits = c(6,6,25,3,3,2))
+```
+
+## Results
+
+```{r}
+kable(additive,caption='Additive Models',digits = c(6,6,10,3,3,2))
+kable(interactive,caption='Interactive Models',digits = c(6,6,25,3,3,2))
+```
+
+```{r}
+#Assumption plots
+plot_resid(model_add_log_sub)
+plot_qq(model_add_log_sub)
+```
+
+We have 6 models in total, 3 of them are additive models and the other 3 are interactive models.Most of them fail the assumptions of normal distribution and equal variance.By comparing and observing the data, we would pick additive model with log tranformation and interactive model with log tranformation. They both have big tests p-value. 
+
+These models all have adjusted r squared between 0.65 to 0.75 (fine score), which show how much is the proportion of response (SalePrice) can be predicted by the independent variables (LotArea, LotFrontage...). Since they are very close, I will not use this as a significant factor to choose model.
+
+The test RMSE show how well our model generalize to data other than the training data. The interactive models all have much higher RMSE (range from 71230 to 344618) than RMSE(all around 45000) of additive model. I take this as an important factor when considering which model to choose.
+
+Based on the above analysis, I would choose the **additive model with log tranformation** as our final model. It has a high adjusted r squared, fine bptest and shapiro test p-value, and a fairly small test RMSE.
+
+## Discussion
+
+```{r}
+summary(model_add_log_sub)
+max(data$SalePrice)
+min(data$SalePrice)
+```
+
+Our best model is the additive model with log tranformation on SalePrice and outlier,influential points removed. We could use our model make prediction for house SalePrice based on this model. It is an additive multiple regression model with log tranformation. A fairly simple model to interpret and have a fine test RMSE(46765.27), we could expect our prediction of the average SalePrice for given features (LotArea,Neighborhood...) could be off around $46765, even though this is a small RMSE comparing my other models. The given data have a range of 34900 dollars to 755000 dollars, a RMSE of 46765 could be too much for the saleprice in lower range but should be fine for the upper range. 
+
+We built and tested various models, some of them may have some specific better statics in some test but failling other tests. For example, two of the interactive model have passed the equal variance test with high p-value, but they both have very large RMSE, which we consider as an significant factor in terms of prediction accuracy. Therefore, we have to sacrifice on assumptions, and pick the one with better RMSE and not too bad assumption p-value.
+
