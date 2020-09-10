@@ -1,6 +1,6 @@
 ---
 title: "House Saleprice Prediction project"
-author: "Yuan Gao (yuang7)"
+author: "Yuan Gao"
 date: "8/3/2020"
 output:
   html_document: default
@@ -13,8 +13,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 **Title**
 Regression Model for House Prices Prediction 
-**Team members** 
-Yuan Gao & Xiao Qin
 
 ## Introduction
 
